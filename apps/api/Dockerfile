@@ -17,7 +17,7 @@ COPY apps/miniapp/package.json ./apps/miniapp/
 RUN npm ci
 
 # Copy source files
-COPY tsconfig.json ./
+COPY tsconfig.base.json ./
 COPY packages ./packages
 COPY apps/api ./apps/api
 
