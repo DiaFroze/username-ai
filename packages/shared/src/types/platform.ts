@@ -1,0 +1,14 @@
+export enum Platform {
+  TELEGRAM = 'TELEGRAM',
+  INSTAGRAM = 'INSTAGRAM',
+  YOUTUBE = 'YOUTUBE',
+  DOMAIN = 'DOMAIN',
+}
+
+export enum CheckStatus {
+  AVAILABLE = 'AVAILABLE',
+  TAKEN = 'TAKEN',
+  UNKNOWN = 'UNKNOWN',
+  RATE_LIMITED = 'RATE_LIMITED',
+  ERROR = 'ERROR',
+}

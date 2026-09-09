@@ -1,0 +1,68 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs & artifacts
+dist/
+build/
+out/
+.next/
+
+# Environment files (NEVER commit actual secrets)
+.env
+.env.*
+!.env.example
+!.env.staging.example
+
+# Testing & Coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# IDE & Editor files
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS Generated Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Secrets, private keys and certificates
+*.pem
+*.key
+*.cert
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+secrets/
+
+# Temporary files & build caches
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+.turbo/
+.cache/
+tmp/
+temp/

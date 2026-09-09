@@ -1,0 +1,25 @@
+{
+  "name": "@username/bot",
+  "version": "1.0.0",
+  "description": "Telegram Bot entrypoint for Username AI",
+  "type": "module",
+  "main": "./dist/bot.js",
+  "types": "./dist/bot.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "rimraf dist",
+    "start": "node dist/bot.js",
+    "dev": "tsx watch src/bot.ts"
+  },
+  "dependencies": {
+    "@username/shared": "*",
+    "dotenv": "^16.4.7",
+    "grammy": "^1.35.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.9",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}
