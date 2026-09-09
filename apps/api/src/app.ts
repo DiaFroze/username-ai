@@ -383,19 +383,22 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     const user = validation.user;
 
     // Persist or update user in PostgreSQL if available
+    let internalUserId: string | null = null;
     try {
       const db = getDb(options.databaseUrl);
       const existing = await db.select().from(users).where(eq(users.telegramId, user.id)).limit(1);
 
       if (existing.length === 0) {
-        await db.insert(users).values({
+        const [inserted] = await db.insert(users).values({
           telegramId: user.id,
           username: user.username,
           firstName: user.first_name,
           lastName: user.last_name,
           languageCode: user.language_code,
-        });
+        }).returning({ id: users.id });
+        internalUserId = inserted?.id ?? null;
       } else {
+        internalUserId = existing[0].id;
         await db.update(users).set({
           username: user.username,
           firstName: user.first_name,
@@ -411,7 +414,9 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     // Issue JWT session token
     const token = jwt.sign(
       {
-        id: user.id,
+        id: internalUserId || user.id,
+        telegram_id: user.id,
+        dbId: internalUserId || undefined,
         first_name: user.first_name,
         last_name: user.last_name,
         username: user.username,

@@ -103,7 +103,41 @@ export class WatchlistService {
     return !!(this.databaseUrl || process.env.DATABASE_URL);
   }
 
+  async resolveDbUserId(userId: string): Promise<string> {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+    if (isUuid) {
+      return userId;
+    }
+    const num = Number(userId);
+    if (!isNaN(num) && num > 0) {
+      try {
+        const db = getDb(this.databaseUrl);
+        const [existing] = await db.select().from(users).where(eq(users.telegramId, num)).limit(1);
+        if (existing) {
+          return existing.id;
+        }
+        const [created] = await db.insert(users).values({
+          telegramId: num,
+          firstName: `Telegram User`,
+        }).returning({ id: users.id });
+        if (created) {
+          return created.id;
+        }
+      } catch (err: any) {
+        if (this.isDbRequired()) {
+          console.error('[WatchlistService DB Error] resolveDbUserId failed:', err.message);
+          const serviceErr = new Error('Database service is temporarily unavailable');
+          (serviceErr as any).statusCode = 503;
+          throw serviceErr;
+        }
+      }
+    }
+    return userId;
+  }
+
   async create(userId: string, dto: CreateWatchlistDto): Promise<WatchlistItem> {
+    const targetUserId = await this.resolveDbUserId(userId);
+
     if (!dto.platform || !Object.values(Platform).includes(dto.platform)) {
       const err = new Error(`Unsupported platform: ${dto.platform}`);
       (err as any).statusCode = 400;
@@ -124,7 +158,7 @@ export class WatchlistService {
     let userTier = 'FREE';
     try {
       const db = getDb(this.databaseUrl);
-      const [dbUser] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      const [dbUser] = await db.select().from(users).where(eq(users.id, targetUserId)).limit(1);
       if (dbUser) {
         userTier = dbUser.tier;
       }
@@ -135,7 +169,7 @@ export class WatchlistService {
         (serviceErr as any).statusCode = 503;
         throw serviceErr;
       }
-      const memUser = this.inMemoryUsers.get(userId);
+      const memUser = this.inMemoryUsers.get(targetUserId) || this.inMemoryUsers.get(userId);
       if (memUser) userTier = memUser.tier;
     }
 
@@ -148,7 +182,7 @@ export class WatchlistService {
       const existingActive = await db
         .select()
         .from(watchlistItems)
-        .where(and(eq(watchlistItems.userId, userId), eq(watchlistItems.isActive, true)));
+        .where(and(eq(watchlistItems.userId, targetUserId), eq(watchlistItems.isActive, true)));
       activeCount = existingActive.length;
 
       // Duplicate check: same (userId, platform, target)
@@ -170,7 +204,7 @@ export class WatchlistService {
       }
       // In-memory fallback
       const userItems = Array.from(this.inMemoryStore.values()).filter(
-        w => w.userId === userId && w.isActive
+        w => (w.userId === targetUserId || w.userId === userId) && w.isActive
       );
       activeCount = userItems.length;
       const dup = userItems.find(
@@ -200,7 +234,7 @@ export class WatchlistService {
 
     const newItem: WatchlistItem = {
       id: crypto.randomUUID(),
-      userId,
+      userId: targetUserId,
       platform: dto.platform,
       target,
       tld,
@@ -326,6 +360,8 @@ export class WatchlistService {
       normalizedItems.push({ target, platform: it.platform, tld });
     }
 
+    const targetUserId = await this.resolveDbUserId(userId);
+
     // 2. Preflight Quota & Active Watches Check
     let userTier = 'FREE';
     let activeCount = 0;
@@ -333,13 +369,13 @@ export class WatchlistService {
 
     try {
       const db = getDb(this.databaseUrl);
-      const [dbUser] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      const [dbUser] = await db.select().from(users).where(eq(users.id, targetUserId)).limit(1);
       if (dbUser) userTier = dbUser.tier;
 
       const activeList = await db
         .select()
         .from(watchlistItems)
-        .where(and(eq(watchlistItems.userId, userId), eq(watchlistItems.isActive, true)));
+        .where(and(eq(watchlistItems.userId, targetUserId), eq(watchlistItems.isActive, true)));
       activeCount = activeList.length;
       for (const w of activeList) {
         existingWatches.add(`${w.platform}:${w.target.toLowerCase()}`);
@@ -351,9 +387,11 @@ export class WatchlistService {
         (serviceErr as any).statusCode = 503;
         throw serviceErr;
       }
-      const memUser = this.inMemoryUsers.get(userId);
+      const memUser = this.inMemoryUsers.get(targetUserId) || this.inMemoryUsers.get(userId);
       if (memUser) userTier = memUser.tier;
-      const memItems = Array.from(this.inMemoryStore.values()).filter(w => w.userId === userId && w.isActive);
+      const memItems = Array.from(this.inMemoryStore.values()).filter(
+        w => (w.userId === targetUserId || w.userId === userId) && w.isActive
+      );
       activeCount = memItems.length;
       for (const w of memItems) {
         existingWatches.add(`${w.platform}:${w.target.toLowerCase()}`);
@@ -385,7 +423,7 @@ export class WatchlistService {
     // 3. Create all items sequentially
     const created: WatchlistItem[] = [];
     for (const it of normalizedItems) {
-      const item = await this.create(userId, {
+      const item = await this.create(targetUserId, {
         platform: it.platform,
         target: it.target,
         tld: it.tld,
@@ -401,12 +439,13 @@ export class WatchlistService {
   }
 
   async list(userId: string): Promise<WatchlistItem[]> {
+    const targetUserId = await this.resolveDbUserId(userId);
     try {
       const db = getDb(this.databaseUrl);
       const rows = await db
         .select()
         .from(watchlistItems)
-        .where(eq(watchlistItems.userId, userId));
+        .where(eq(watchlistItems.userId, targetUserId));
 
       return rows.map(r => this.mapDbRowToItem(r));
     } catch (err: any) {
@@ -417,18 +456,19 @@ export class WatchlistService {
         throw serviceErr;
       }
       return Array.from(this.inMemoryStore.values())
-        .filter(w => w.userId === userId)
+        .filter(w => w.userId === targetUserId || w.userId === userId)
         .map(w => this.mapDbRowToItem(w));
     }
   }
 
   async getById(userId: string, id: string): Promise<WatchlistItem> {
+    const targetUserId = await this.resolveDbUserId(userId);
     try {
       const db = getDb(this.databaseUrl);
       const [r] = await db
         .select()
         .from(watchlistItems)
-        .where(and(eq(watchlistItems.id, id), eq(watchlistItems.userId, userId)))
+        .where(and(eq(watchlistItems.id, id), eq(watchlistItems.userId, targetUserId)))
         .limit(1);
 
       if (!r) {
@@ -447,7 +487,7 @@ export class WatchlistService {
         throw serviceErr;
       }
       const mem = this.inMemoryStore.get(id);
-      if (!mem || mem.userId !== userId) {
+      if (!mem || (mem.userId !== targetUserId && mem.userId !== userId)) {
         const notFound = new Error('Watchlist item not found');
         (notFound as any).statusCode = 404;
         throw notFound;
@@ -457,14 +497,15 @@ export class WatchlistService {
   }
 
   async delete(userId: string, id: string): Promise<{ success: boolean; id: string }> {
+    const targetUserId = await this.resolveDbUserId(userId);
     // IDOR protection: verifies item exists and belongs to requesting user
-    await this.getById(userId, id);
+    await this.getById(targetUserId, id);
 
     try {
       const db = getDb(this.databaseUrl);
       await db
         .delete(watchlistItems)
-        .where(and(eq(watchlistItems.id, id), eq(watchlistItems.userId, userId)));
+        .where(and(eq(watchlistItems.id, id), eq(watchlistItems.userId, targetUserId)));
     } catch (err: any) {
       if (this.isDbRequired()) {
         console.error('[WatchlistService DB Error] delete item failed:', err.message);
@@ -480,7 +521,8 @@ export class WatchlistService {
   }
 
   async update(userId: string, id: string, dto: UpdateWatchlistDto): Promise<WatchlistItem> {
-    const existing = await this.getById(userId, id);
+    const targetUserId = await this.resolveDbUserId(userId);
+    const existing = await this.getById(targetUserId, id);
 
     const requestedMinutes =
       dto.checkIntervalMinutes ??
@@ -507,7 +549,7 @@ export class WatchlistService {
           checkIntervalMinutes: updated.checkIntervalMinutes,
           updatedAt: new Date(),
         })
-        .where(and(eq(watchlistItems.id, id), eq(watchlistItems.userId, userId)));
+        .where(and(eq(watchlistItems.id, id), eq(watchlistItems.userId, targetUserId)));
     } catch (err: any) {
       if (this.isDbRequired()) {
         console.error('[WatchlistService DB Error] update item failed:', err.message);
@@ -526,16 +568,17 @@ export class WatchlistService {
    * Immediate user-initiated check with cooldown rate limiting and double confirmation.
    */
   async checkNow(userId: string, id: string): Promise<WatchlistCheckNowResponse> {
-    const item = await this.getById(userId, id);
+    const targetUserId = await this.resolveDbUserId(userId);
+    const item = await this.getById(targetUserId, id);
 
     // Rate-limit check-now cooldown per policy
     let userTier = 'FREE';
     try {
       const db = getDb(this.databaseUrl);
-      const [dbUser] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      const [dbUser] = await db.select().from(users).where(eq(users.id, targetUserId)).limit(1);
       if (dbUser) userTier = dbUser.tier;
     } catch {
-      const memUser = this.inMemoryUsers.get(userId);
+      const memUser = this.inMemoryUsers.get(targetUserId) || this.inMemoryUsers.get(userId);
       if (memUser) userTier = memUser.tier;
     }
 
