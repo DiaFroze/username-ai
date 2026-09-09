@@ -12,7 +12,7 @@ COPY apps/bot/package.json ./apps/bot/
 RUN npm ci
 
 # Copy source files
-COPY tsconfig.json ./
+COPY tsconfig*.json ./
 COPY packages/shared ./packages/shared
 COPY apps/bot ./apps/bot
 

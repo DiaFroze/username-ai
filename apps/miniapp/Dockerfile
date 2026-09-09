@@ -13,7 +13,7 @@ COPY apps/miniapp/package.json ./apps/miniapp/
 
 RUN npm ci
 
-COPY tsconfig.json ./
+COPY tsconfig*.json ./
 COPY packages/shared ./packages/shared
 COPY apps/miniapp ./apps/miniapp
 
