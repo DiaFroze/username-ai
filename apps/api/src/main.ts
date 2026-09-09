@@ -1,10 +1,22 @@
 import { appConfig } from './config/env.js';
 import { buildApp } from './app.js';
+import { runMigrations } from '@username/db';
 
 const PORT = appConfig.PORT;
 const HOST = appConfig.HOST;
 
 async function bootstrap() {
+  if (appConfig.DATABASE_URL) {
+    try {
+      console.log('🔄 Checking and applying database migrations...');
+      await runMigrations({ databaseUrl: appConfig.DATABASE_URL });
+      console.log('✅ Database migrations verified and applied.');
+    } catch (err: any) {
+      console.error('❌ Failed to apply database migrations:', err.message);
+      process.exit(1);
+    }
+  }
+
   const app = buildApp({
     logger: true,
     databaseUrl: appConfig.DATABASE_URL,

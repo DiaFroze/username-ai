@@ -11,6 +11,8 @@ dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 export interface MigrationOptions {
   drizzleDir?: string;
   client?: any;
+  databaseUrl?: string;
+  closePoolOnFinish?: boolean;
 }
 
 export async function runMigrations(options?: MigrationOptions): Promise<string[]> {
@@ -18,7 +20,7 @@ export async function runMigrations(options?: MigrationOptions): Promise<string[
   const appliedMigrations: string[] = [];
 
   const externalClient = options?.client;
-  const pool = externalClient ? null : getDbPool();
+  const pool = externalClient ? null : getDbPool(options?.databaseUrl);
   const client = externalClient || (await pool!.connect());
 
   try {
@@ -95,13 +97,15 @@ export async function runMigrations(options?: MigrationOptions): Promise<string[
   } finally {
     if (!externalClient) {
       client.release();
-      await closeDbPool();
+      if (options?.closePoolOnFinish) {
+        await closeDbPool();
+      }
     }
   }
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  runMigrations()
+  runMigrations({ closePoolOnFinish: true })
     .then(() => process.exit(0))
     .catch(() => process.exit(1));
 }
