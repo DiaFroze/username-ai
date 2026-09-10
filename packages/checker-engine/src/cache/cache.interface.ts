@@ -23,7 +23,7 @@ export function buildCacheKey(platform: Platform, identifier: string): string {
   const clean = identifier.trim().toLowerCase();
   switch (platform) {
     case Platform.TELEGRAM:
-      return `checker:telegram:${clean}`;
+      return `checker:telegram:v2:${clean}`;
     case Platform.YOUTUBE:
       return `checker:youtube:${clean}`;
     case Platform.DOMAIN:

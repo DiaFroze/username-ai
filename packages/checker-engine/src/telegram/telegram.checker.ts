@@ -84,9 +84,9 @@ export class TelegramChecker extends BaseChecker {
     const fetchFn = this.customFetch || globalThis.fetch;
     const url = `https://t.me/${clean}`;
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
 
       const response = await fetchFn(url, {
         method: 'GET',
@@ -98,7 +98,8 @@ export class TelegramChecker extends BaseChecker {
         signal: controller.signal,
       });
 
-      clearTimeout(timeoutId);
+      // Keep the deadline active while reading the body too.
+      const html = await response.text();
 
       const responseTimeMs = Date.now() - startTime;
 
@@ -141,15 +142,16 @@ export class TelegramChecker extends BaseChecker {
         };
       }
 
-      const html = await response.text();
-
       // Detection indicators:
       // An active account/channel/bot has action button and/or photo/extra info
-      const hasActionButton = html.includes('tgme_action_button_new') || html.includes('View in Telegram') || html.includes('Send Message');
-      const hasPhoto = html.includes('tgme_page_photo');
-      const hasExtra = html.includes('tgme_page_extra') && (html.includes('subscribers') || html.includes('members') || html.includes('@'));
+      const hasContactPrompt = /If you have\s+(?:<strong>)?Telegram(?:<\/strong>)?,\s+you can contact/i.test(html);
+      // Generic contact pages also contain Send Message and resolve links.
+      // Only actual profile markup is evidence; CSS class names alone are not.
+      const hasPhoto = /<[^>]+class=["'][^"']*\btgme_page_photo(?:_image)?\b[^"']*["']/i.test(html);
+      const hasTitle = /<[^>]+class=["'][^"']*\btgme_page_title\b[^"']*["'][^>]*>\s*(?:<[^>]+>\s*)*[^<\s]/i.test(html);
+      const hasExtra = /<[^>]+class=["'][^"']*\btgme_page_extra\b[^"']*["'][^>]*>[\s\S]*?(?:subscribers|members|@[a-z0-9_]+)[\s\S]*?<\//i.test(html);
 
-      if (hasActionButton || hasPhoto || hasExtra) {
+      if (response.ok && !hasContactPrompt && hasTitle && (hasPhoto || hasExtra)) {
         return {
           platform: this.platform,
           username: clean,
@@ -164,10 +166,7 @@ export class TelegramChecker extends BaseChecker {
       // If page says "If you have Telegram, you can contact @..." with no active public elements,
       // public web cannot verify handle vacancy (user may have private account).
       // Per architectural rule: do not return optimistic AVAILABLE without definitive proof.
-      const hasContactPrompt = html.includes('If you have <strong>Telegram</strong>, you can contact') ||
-                               html.includes('If you have Telegram, you can contact');
-
-      if (hasContactPrompt && !hasActionButton && !hasPhoto) {
+      if (hasContactPrompt) {
         return {
           platform: this.platform,
           username: clean,
@@ -206,6 +205,8 @@ export class TelegramChecker extends BaseChecker {
         errorCode: isTimeout ? 'TIMEOUT' : (err.code || err.name || 'FETCH_ERROR'),
         rawDetails: err.message,
       };
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 }

@@ -2,16 +2,16 @@ import { IAIProvider } from './ai.interface.js';
 import { NamingRequest, GeneratedCandidate } from '@username/shared';
 import { validateAndCleanAiResponse } from './ai.schema.js';
 
-export interface OpenAIProviderOptions {
+export interface MiraiProviderOptions {
   apiKey?: string;
-  model?: string;
   baseUrl?: string;
+  model?: string;
   timeoutMs?: number;
   fetch?: typeof fetch;
 }
 
-export class OpenAIProvider implements IAIProvider {
-  readonly providerName = 'openai';
+export class MiraiProvider implements IAIProvider {
+  readonly providerName = 'mirai';
 
   private readonly apiKey?: string;
   private readonly baseUrl: string;
@@ -19,22 +19,22 @@ export class OpenAIProvider implements IAIProvider {
   private readonly timeoutMs: number;
   private readonly customFetch?: typeof fetch;
 
-  constructor(options?: OpenAIProviderOptions) {
-    this.apiKey = options?.apiKey || process.env.OPENAI_API_KEY;
-    this.baseUrl = (options?.baseUrl || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '');
-    this.model = options?.model || process.env.AI_MODEL || 'gpt-4o-mini';
-    this.timeoutMs = options?.timeoutMs ?? 8000;
+  constructor(options?: MiraiProviderOptions) {
+    this.apiKey = options?.apiKey || process.env.MIRAI_API_KEY || process.env.OPENAI_API_KEY;
+    this.baseUrl = (options?.baseUrl || process.env.MIRAI_BASE_URL || 'https://api.miraiapi.com/v1').replace(/\/+$/, '');
+    this.model = options?.model || process.env.AI_MODEL || 'gpt-5.6-luna';
+    this.timeoutMs = options?.timeoutMs ?? 12000;
     this.customFetch = options?.fetch;
   }
 
   async generateNames(input: NamingRequest): Promise<GeneratedCandidate[]> {
     if (!this.apiKey) {
-      throw new Error('OPENAI_API_KEY is not configured');
+      throw new Error('MIRAI_API_KEY is not configured');
     }
 
     const fetchFn = this.customFetch || globalThis.fetch;
     const lang = input.language || 'ru';
-    const targetCount = input.count || 20;
+    const targetCount = Math.min(input.count || 20, 30);
 
     const systemPrompt =
       `You are an elite brand strategist and naming expert. ` +
@@ -49,7 +49,7 @@ export class OpenAIProvider implements IAIProvider {
       `- Generate up to ${targetCount} creative candidates.`;
 
     const userContent = JSON.stringify({
-      keyword: input.query,
+      query: input.query,
       intent: input.intent,
       category: input.category || 'General',
       style: input.style || 'MODERN',
@@ -67,7 +67,6 @@ export class OpenAIProvider implements IAIProvider {
         },
         body: JSON.stringify({
           model: this.model,
-          response_format: { type: 'json_object' },
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userContent },
@@ -82,7 +81,16 @@ export class OpenAIProvider implements IAIProvider {
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => '');
-        throw new Error(`OpenAI API error ${response.status}: ${errorText}`);
+        if (response.status === 401) {
+          throw new Error(`Mirai API unauthorized (401): invalid or expired token`);
+        }
+        if (response.status === 403) {
+          throw new Error(`Mirai API forbidden (403): insufficient quota or access denied`);
+        }
+        if (response.status === 429) {
+          throw new Error(`Mirai API rate limit or quota exhausted (429)`);
+        }
+        throw new Error(`Mirai API error ${response.status}: ${errorText.slice(0, 200)}`);
       }
 
       const json = await response.json() as any;
@@ -91,8 +99,27 @@ export class OpenAIProvider implements IAIProvider {
         return [];
       }
 
-      const rawParsed = JSON.parse(contentStr);
-      return validateAndCleanAiResponse(rawParsed);
+      // Extract JSON payload: handle markdown codeblocks if model wraps it
+      let jsonStringToParse = contentStr.trim();
+      const codeBlockMatch = jsonStringToParse.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (codeBlockMatch) {
+        jsonStringToParse = codeBlockMatch[1].trim();
+      }
+
+      try {
+        const rawParsed = JSON.parse(jsonStringToParse);
+        return validateAndCleanAiResponse(rawParsed);
+      } catch (parseErr: any) {
+        // Fallback: search for first { and last }
+        const start = jsonStringToParse.indexOf('{');
+        const end = jsonStringToParse.lastIndexOf('}');
+        if (start !== -1 && end !== -1 && end > start) {
+          const slice = jsonStringToParse.substring(start, end + 1);
+          const rawParsed = JSON.parse(slice);
+          return validateAndCleanAiResponse(rawParsed);
+        }
+        throw new Error(`Failed to parse Mirai model JSON output: ${parseErr.message}`);
+      }
     } catch (err: any) {
       clearTimeout(timeoutId);
       throw err;

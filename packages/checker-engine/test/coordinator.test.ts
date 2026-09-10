@@ -11,7 +11,7 @@ describe('CheckerCoordinator', () => {
     const mockTgFetch = async () => ({
       ok: true,
       status: 200,
-      text: async () => '<html><body><a class="tgme_action_button_new" href="#">View</a></body></html>',
+      text: async () => '<html><body><div class="tgme_page_title">Example profile</div><div class="tgme_page_extra">100 subscribers</div><a class="tgme_action_button_new" href="#">View</a></body></html>',
     }) as any;
 
     const mockYtFetch = async () => ({
@@ -56,7 +56,7 @@ describe('CheckerCoordinator', () => {
     const mockTgFetch = async () => ({
       ok: true,
       status: 200,
-      text: async () => '<html><body><a class="tgme_action_button_new" href="#">View</a></body></html>',
+      text: async () => '<html><body><div class="tgme_page_title">Example profile</div><div class="tgme_page_extra">100 subscribers</div><a class="tgme_action_button_new" href="#">View</a></body></html>',
     }) as any;
 
     // Simulate YouTube checker throwing unexpected runtime exception
@@ -103,7 +103,7 @@ describe('CheckerCoordinator', () => {
       return {
         ok: true,
         status: 200,
-        text: async () => '<html><body><a class="tgme_action_button_new" href="#">View</a></body></html>',
+        text: async () => '<html><body><div class="tgme_page_title">Example profile</div><div class="tgme_page_extra">100 subscribers</div><a class="tgme_action_button_new" href="#">View</a></body></html>',
       } as any;
     };
 

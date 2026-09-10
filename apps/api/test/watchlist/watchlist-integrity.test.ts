@@ -23,7 +23,7 @@ describe('Phase 1D.1: Watchlist Data Integrity & Reliability Audit', () => {
         fetch: async () => ({
           ok: true,
           status: 200,
-          text: async () => '<html><body><div class="tgme_page_title">Active Channel</div><a class="tgme_action_button_new">View in Telegram</a></body></html>',
+          text: async () => '<html><body><div class="tgme_page_title">Active Channel</div><div class="tgme_page_title">Example profile</div><div class="tgme_page_extra">100 subscribers</div><a class="tgme_action_button_new">View in Telegram</a></body></html>',
         }) as any,
       }),
       youtubeChecker: new YouTubeChecker({

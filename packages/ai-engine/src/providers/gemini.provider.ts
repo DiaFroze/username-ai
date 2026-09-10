@@ -35,6 +35,7 @@ export class GeminiProvider implements IAIProvider {
 
     const systemInstruction =
       `You are a top-tier branding and naming expert. ` +
+      `Use the meaning, industry, audience and associations of the user input. At least 70% of names must be distinct semantic or phonetic ideas, not the keyword with get/go/co/try or generic suffixes. Explain the specific connection and recommendation for each name. Never claim availability; a separate checker verifies it. ` +
       `Generate clean, punchy Latin brand names and handles. ` +
       `Output MUST be a JSON object with this exact format:\n` +
       `{"candidates": [{"name": "string", "reason": "string", "tags": ["string"], "aiScore": number, "generationType": "AI_CREATIVE"}]}\n` +

@@ -109,7 +109,7 @@ const INTENTS: { id: NamingIntent; label: string }[] = [
   { id: 'PROJECT', label: 'Проект' },
   { id: 'PERSONAL', label: 'Личный' },
   { id: 'CREATIVE', label: 'Креативный' },
-  { id: 'AUTO', label: 'AI Свободный' },
+  { id: 'AUTO', label: 'По идее' },
 ];
 
 const CATEGORIES = [
@@ -132,6 +132,7 @@ export default function App() {
   const [category, setCategory] = useState<string>('Tech & AI');
   const [oneNameEverywhere, setOneNameEverywhere] = useState(true);
   const [candidateCount, setCandidateCount] = useState(10);
+  const [generationMode, setGenerationMode] = useState<'AI' | 'TEMPLATE' | undefined>();
   const [candidates, setCandidates] = useState<ScoredCandidate[]>([]);
   const [expandedCandidates, setExpandedCandidates] = useState<Record<string, boolean>>({});
   const [copiedName, setCopiedName] = useState<string | null>(null);
@@ -276,6 +277,7 @@ export default function App() {
     setLoading(true);
     setError(null);
     setCandidates([]);
+    setGenerationMode(undefined);
     triggerHaptic('medium');
 
     try {
@@ -290,7 +292,7 @@ export default function App() {
         body: JSON.stringify({
           query: cleanQuery,
           intent,
-          category: intent === 'AUTO' ? category : undefined,
+          category,
           language: 'ru',
           platforms: selectedPlatforms,
           tlds: selectedPlatforms.includes(Platform.DOMAIN) ? selectedTlds : undefined,
@@ -306,6 +308,7 @@ export default function App() {
 
       const data: NamingPipelineResponse = await res.json();
       setCandidates(data.candidates || []);
+      setGenerationMode(data.generationMode);
       triggerNotificationHaptic('success');
     } catch (err: any) {
       setError(err.message || 'Ошибка генерации и проверки имен');
@@ -336,7 +339,7 @@ export default function App() {
         headers['Authorization'] = `Bearer ${authToken}`;
       }
 
-      const res = await fetch(`${API_BASE}/check`, {
+      const res = await fetch(`${API_BASE}/api/v1/check`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -466,22 +469,22 @@ export default function App() {
   const getStatusDot = (status: CheckStatus) => {
     switch (status) {
       case CheckStatus.AVAILABLE:
-        return { color: '#10b981', label: 'Свободен', bg: 'rgba(16, 185, 129, 0.14)', text: '#34d399' };
+        return { color: '#10b981', label: 'Свободен', bg: 'rgba(16, 185, 129, 0.14)', text: '#047857' };
       case CheckStatus.TAKEN:
-        return { color: '#71717a', label: 'Занят', bg: 'rgba(113, 113, 122, 0.16)', text: '#a1a1aa' };
+        return { color: '#64748b', label: 'Занят', bg: 'rgba(113, 113, 122, 0.16)', text: '#475569' };
       case CheckStatus.RATE_LIMITED:
-        return { color: '#f59e0b', label: 'Лимит', bg: 'rgba(245, 158, 11, 0.14)', text: '#fbbf24' };
+        return { color: '#f59e0b', label: 'Лимит', bg: 'rgba(245, 158, 11, 0.14)', text: '#92400e' };
       case CheckStatus.UNKNOWN:
-        return { color: '#eab308', label: 'Проверка', bg: 'rgba(234, 179, 8, 0.14)', text: '#fde047' };
+        return { color: '#eab308', label: 'Не подтверждено', bg: 'rgba(234, 179, 8, 0.14)', text: '#854d0e' };
       default:
-        return { color: '#71717a', label: 'Ошибка', bg: 'rgba(113, 113, 122, 0.16)', text: '#a1a1aa' };
+        return { color: '#64748b', label: 'Ошибка', bg: 'rgba(113, 113, 122, 0.16)', text: '#475569' };
     }
   };
 
   const getScoreMeta = (score: number) => {
     if (score >= 80) return { color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)', border: 'rgba(16, 185, 129, 0.25)' };
     if (score >= 50) return { color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)', border: 'rgba(245, 158, 11, 0.25)' };
-    return { color: '#71717a', bg: 'rgba(113, 113, 122, 0.1)', border: 'rgba(113, 113, 122, 0.25)' };
+    return { color: '#64748b', bg: 'rgba(113, 113, 122, 0.1)', border: 'rgba(113, 113, 122, 0.25)' };
   };
 
   const getPlatformIcon = (platform: Platform) => {
@@ -527,7 +530,7 @@ export default function App() {
         maxWidth: 480,
         margin: '0 auto',
         padding: '16px 14px 40px 14px',
-        color: '#f4f4f6',
+        color: '#0f172a',
         minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
@@ -541,7 +544,7 @@ export default function App() {
           alignItems: 'center',
           paddingBottom: 14,
           marginBottom: 14,
-          borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+          borderBottom: '1px solid rgba(37, 99, 235, 0.06)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
@@ -550,19 +553,19 @@ export default function App() {
               width: 32,
               height: 32,
               borderRadius: 9,
-              backgroundColor: '#18181b',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              backgroundColor: '#eff6ff',
+              border: '1px solid rgba(37, 99, 235, 0.1)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#ffffff',
+              color: '#0f172a',
             }}
           >
             <Icons.Sparkles />
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: -0.3, color: '#ffffff' }}>
+              <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: -0.3, color: '#0f172a' }}>
                 username
               </span>
               <span
@@ -571,8 +574,8 @@ export default function App() {
                   fontWeight: 600,
                   padding: '1px 5px',
                   borderRadius: 5,
-                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                  color: '#a1a1aa',
+                  backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                  color: '#475569',
                   letterSpacing: 0.4,
                   fontFamily: 'JetBrains Mono, monospace',
                 }}
@@ -580,7 +583,7 @@ export default function App() {
                 AI 2.0
               </span>
             </div>
-            <div style={{ fontSize: 11, color: '#71717a' }}>
+            <div style={{ fontSize: 11, color: '#64748b' }}>
               brand naming & availability
             </div>
           </div>
@@ -594,10 +597,10 @@ export default function App() {
               gap: 6,
               padding: '4px 10px 4px 6px',
               borderRadius: 20,
-              backgroundColor: 'rgba(255, 255, 255, 0.04)',
-              border: '1px solid rgba(255, 255, 255, 0.06)',
+              backgroundColor: 'rgba(37, 99, 235, 0.04)',
+              border: '1px solid rgba(37, 99, 235, 0.06)',
               fontSize: 12,
-              color: '#a1a1aa',
+              color: '#475569',
             }}
           >
             <div
@@ -605,13 +608,13 @@ export default function App() {
                 width: 20,
                 height: 20,
                 borderRadius: '50%',
-                backgroundColor: '#27272a',
+                backgroundColor: '#e2e8f0',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: 10,
                 fontWeight: 700,
-                color: '#ffffff',
+                color: '#0f172a',
               }}
             >
               {currentUser.first_name?.[0] || 'U'}
@@ -624,7 +627,7 @@ export default function App() {
           <div
             style={{
               fontSize: 11,
-              color: '#71717a',
+              color: '#64748b',
               display: 'flex',
               alignItems: 'center',
               gap: 4,
@@ -643,8 +646,8 @@ export default function App() {
           gap: 4,
           padding: 3,
           borderRadius: 12,
-          backgroundColor: '#121215',
-          border: '1px solid rgba(255, 255, 255, 0.06)',
+          backgroundColor: '#ffffff',
+          border: '1px solid rgba(37, 99, 235, 0.06)',
           marginBottom: 16,
         }}
       >
@@ -659,8 +662,8 @@ export default function App() {
             padding: '8px 10px',
             borderRadius: 9,
             border: 'none',
-            backgroundColor: activeTab === 'generate' ? '#27272a' : 'transparent',
-            color: activeTab === 'generate' ? '#ffffff' : '#71717a',
+            backgroundColor: activeTab === 'generate' ? '#e2e8f0' : 'transparent',
+            color: activeTab === 'generate' ? '#0f172a' : '#64748b',
             fontSize: 12,
             fontWeight: 600,
             cursor: 'pointer',
@@ -669,7 +672,7 @@ export default function App() {
             justifyContent: 'center',
             gap: 6,
             transition: 'all 0.15s ease',
-            boxShadow: activeTab === 'generate' ? '0 1px 3px rgba(0,0,0,0.4)' : 'none',
+            boxShadow: activeTab === 'generate' ? '0 1px 3px rgba(15,23,42,0.06)' : 'none',
           }}
         >
           <Icons.Sparkles />
@@ -687,8 +690,8 @@ export default function App() {
             padding: '8px 10px',
             borderRadius: 9,
             border: 'none',
-            backgroundColor: activeTab === 'check' ? '#27272a' : 'transparent',
-            color: activeTab === 'check' ? '#ffffff' : '#71717a',
+            backgroundColor: activeTab === 'check' ? '#e2e8f0' : 'transparent',
+            color: activeTab === 'check' ? '#0f172a' : '#64748b',
             fontSize: 12,
             fontWeight: 600,
             cursor: 'pointer',
@@ -697,7 +700,7 @@ export default function App() {
             justifyContent: 'center',
             gap: 6,
             transition: 'all 0.15s ease',
-            boxShadow: activeTab === 'check' ? '0 1px 3px rgba(0,0,0,0.4)' : 'none',
+            boxShadow: activeTab === 'check' ? '0 1px 3px rgba(15,23,42,0.06)' : 'none',
           }}
         >
           <Icons.Search />
@@ -716,8 +719,8 @@ export default function App() {
             padding: '8px 10px',
             borderRadius: 9,
             border: 'none',
-            backgroundColor: activeTab === 'watchlist' ? '#27272a' : 'transparent',
-            color: activeTab === 'watchlist' ? '#ffffff' : '#71717a',
+            backgroundColor: activeTab === 'watchlist' ? '#e2e8f0' : 'transparent',
+            color: activeTab === 'watchlist' ? '#0f172a' : '#64748b',
             fontSize: 12,
             fontWeight: 600,
             cursor: 'pointer',
@@ -726,7 +729,7 @@ export default function App() {
             justifyContent: 'center',
             gap: 6,
             transition: 'all 0.15s ease',
-            boxShadow: activeTab === 'watchlist' ? '0 1px 3px rgba(0,0,0,0.4)' : 'none',
+            boxShadow: activeTab === 'watchlist' ? '0 1px 3px rgba(15,23,42,0.06)' : 'none',
           }}
         >
           <Icons.Bell />
@@ -737,8 +740,8 @@ export default function App() {
                 fontSize: 10,
                 padding: '1px 5px',
                 borderRadius: 10,
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                color: '#ffffff',
+                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                color: '#0f172a',
                 fontWeight: 700,
               }}
             >
@@ -787,32 +790,33 @@ export default function App() {
       {activeTab === 'generate' && (
         <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {/* Main Search Input */}
+          <div style={{ padding: '12px 2px 6px' }}><h1 style={{ fontSize: 28, lineHeight: 1.2, letterSpacing: -1 }}>Имя, с которого<br/><span style={{ color: '#2563eb' }}>всё начинается.</span></h1><p style={{ fontSize: 13, color: '#475569', marginTop: 10, lineHeight: 1.6 }}>Проверим ваше название и подберём близкие по смыслу варианты.</p></div>
           <form onSubmit={handleGenerate} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                backgroundColor: '#121215',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
+                backgroundColor: '#ffffff',
+                border: '1px solid rgba(37, 99, 235, 0.1)',
                 borderRadius: 14,
                 padding: '4px 6px 4px 14px',
                 transition: 'border-color 0.2s',
               }}
             >
-              <div style={{ color: '#71717a', marginRight: 10, display: 'flex', alignItems: 'center' }}>
+              <div style={{ color: '#64748b', marginRight: 10, display: 'flex', alignItems: 'center' }}>
                 <Icons.Search />
               </div>
               <input
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Идея, проект, ключевые слова..."
+                aria-label="Название или описание бренда" placeholder="Название бренда или ваша идея…"
                 style={{
                   flex: 1,
                   background: 'none',
                   border: 'none',
                   outline: 'none',
-                  color: '#ffffff',
+                  color: '#0f172a',
                   fontSize: 14,
                   padding: '10px 0',
                 }}
@@ -824,7 +828,7 @@ export default function App() {
                   style={{
                     background: 'none',
                     border: 'none',
-                    color: '#71717a',
+                    color: '#64748b',
                     cursor: 'pointer',
                     padding: '6px 8px',
                     fontSize: 14,
@@ -840,8 +844,8 @@ export default function App() {
                   padding: '10px 16px',
                   borderRadius: 10,
                   border: 'none',
-                  backgroundColor: loading || !query.trim() ? '#27272a' : '#ffffff',
-                  color: loading || !query.trim() ? '#52525b' : '#000000',
+                  backgroundColor: loading || !query.trim() ? '#e2e8f0' : '#0f172a',
+                  color: loading || !query.trim() ? '#64748b' : '#ffffff',
                   fontWeight: 700,
                   fontSize: 12,
                   cursor: loading || !query.trim() ? 'not-allowed' : 'pointer',
@@ -849,7 +853,7 @@ export default function App() {
                   whiteSpace: 'nowrap',
                 }}
               >
-                {loading ? 'AI...' : 'Создать'}
+                {loading ? 'Подбираем…' : 'Подобрать'}
               </button>
             </div>
 
@@ -877,9 +881,9 @@ export default function App() {
                     style={{
                       padding: '6px 12px',
                       borderRadius: 20,
-                      border: `1px solid ${active ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.06)'}`,
-                      backgroundColor: active ? 'rgba(255, 255, 255, 0.1)' : '#121215',
-                      color: active ? '#ffffff' : '#71717a',
+                      border: `1px solid ${active ? 'rgba(37, 99, 235, 0.3)' : 'rgba(37, 99, 235, 0.06)'}`,
+                      backgroundColor: active ? 'rgba(37, 99, 235, 0.1)' : '#ffffff',
+                      color: active ? '#0f172a' : '#64748b',
                       fontSize: 12,
                       fontWeight: active ? 600 : 500,
                       cursor: 'pointer',
@@ -906,9 +910,9 @@ export default function App() {
                 justifyContent: 'space-between',
                 padding: '9px 12px',
                 borderRadius: 10,
-                backgroundColor: '#121215',
-                border: '1px solid rgba(255, 255, 255, 0.06)',
-                color: '#a1a1aa',
+                backgroundColor: '#ffffff',
+                border: '1px solid rgba(37, 99, 235, 0.06)',
+                color: '#475569',
                 fontSize: 12,
                 cursor: 'pointer',
               }}
@@ -916,11 +920,11 @@ export default function App() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Icons.Sliders />
                 <span>Параметры генерации</span>
-                <span style={{ color: '#52525b', fontSize: 11 }}>
+                <span style={{ color: '#64748b', fontSize: 11 }}>
                   ({selectedPlatforms.length} пл., {candidateCount} шт.)
                 </span>
               </div>
-              <div style={{ color: '#71717a' }}>
+              <div style={{ color: '#64748b' }}>
                 {showFilters ? <Icons.ChevronUp /> : <Icons.ChevronDown />}
               </div>
             </button>
@@ -932,17 +936,17 @@ export default function App() {
                 style={{
                   padding: 14,
                   borderRadius: 14,
-                  backgroundColor: '#121215',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid rgba(37, 99, 235, 0.08)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 14,
                 }}
               >
                 {/* Intent == AUTO Category */}
-                {intent === 'AUTO' && (
+                {(
                   <div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: '#71717a', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
                       Тематика
                     </div>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -959,9 +963,9 @@ export default function App() {
                             style={{
                               padding: '5px 10px',
                               borderRadius: 8,
-                              border: `1px solid ${active ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.06)'}`,
-                              backgroundColor: active ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-                              color: active ? '#ffffff' : '#71717a',
+                              border: `1px solid ${active ? 'rgba(37, 99, 235, 0.3)' : 'rgba(37, 99, 235, 0.06)'}`,
+                              backgroundColor: active ? 'rgba(37, 99, 235, 0.08)' : 'transparent',
+                              color: active ? '#0f172a' : '#64748b',
                               fontSize: 11,
                               cursor: 'pointer',
                             }}
@@ -976,7 +980,7 @@ export default function App() {
 
                 {/* Platforms selection */}
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: '#71717a', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
                     Платформы
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -991,9 +995,9 @@ export default function App() {
                             flex: 1,
                             padding: '8px 10px',
                             borderRadius: 10,
-                            border: `1px solid ${active ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.06)'}`,
-                            backgroundColor: active ? 'rgba(255, 255, 255, 0.07)' : 'transparent',
-                            color: active ? '#ffffff' : '#71717a',
+                            border: `1px solid ${active ? 'rgba(37, 99, 235, 0.25)' : 'rgba(37, 99, 235, 0.06)'}`,
+                            backgroundColor: active ? 'rgba(37, 99, 235, 0.07)' : 'transparent',
+                            color: active ? '#0f172a' : '#64748b',
                             fontSize: 12,
                             fontWeight: 600,
                             cursor: 'pointer',
@@ -1014,7 +1018,7 @@ export default function App() {
                 {/* TLD Selection */}
                 {selectedPlatforms.includes(Platform.DOMAIN) && (
                   <div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: '#71717a', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
                       Доменные зоны
                     </div>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -1028,9 +1032,9 @@ export default function App() {
                             style={{
                               padding: '4px 9px',
                               borderRadius: 6,
-                              border: `1px solid ${active ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.06)'}`,
-                              backgroundColor: active ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-                              color: active ? '#ffffff' : '#71717a',
+                              border: `1px solid ${active ? 'rgba(37, 99, 235, 0.25)' : 'rgba(37, 99, 235, 0.06)'}`,
+                              backgroundColor: active ? 'rgba(37, 99, 235, 0.08)' : 'transparent',
+                              color: active ? '#0f172a' : '#64748b',
                               fontSize: 11,
                               fontFamily: 'JetBrains Mono, monospace',
                               cursor: 'pointer',
@@ -1056,14 +1060,14 @@ export default function App() {
                     justifyContent: 'space-between',
                     cursor: 'pointer',
                     padding: '8px 0',
-                    borderTop: '1px solid rgba(255, 255, 255, 0.04)',
+                    borderTop: '1px solid rgba(37, 99, 235, 0.04)',
                   }}
                 >
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#f4f4f6' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
                       One Name Everywhere
                     </div>
-                    <div style={{ fontSize: 11, color: '#71717a' }}>
+                    <div style={{ fontSize: 11, color: '#64748b' }}>
                       Приоритет именам, доступным сразу во всех сервисах
                     </div>
                   </div>
@@ -1072,7 +1076,7 @@ export default function App() {
                       width: 36,
                       height: 20,
                       borderRadius: 10,
-                      backgroundColor: oneNameEverywhere ? '#ffffff' : '#27272a',
+                      backgroundColor: oneNameEverywhere ? '#0f172a' : '#e2e8f0',
                       position: 'relative',
                       transition: 'background-color 0.2s',
                     }}
@@ -1082,7 +1086,7 @@ export default function App() {
                         width: 14,
                         height: 14,
                         borderRadius: '50%',
-                        backgroundColor: oneNameEverywhere ? '#000000' : '#71717a',
+                        backgroundColor: oneNameEverywhere ? '#ffffff' : '#64748b',
                         position: 'absolute',
                         top: 3,
                         left: oneNameEverywhere ? 19 : 3,
@@ -1093,12 +1097,12 @@ export default function App() {
                 </div>
 
                 {/* Candidate Count */}
-                <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.04)', paddingTop: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: '#71717a', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                <div style={{ borderTop: '1px solid rgba(37, 99, 235, 0.04)', paddingTop: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
                     Количество вариантов
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
-                    {[5, 10, 15, 20].map((num) => {
+                    {[5, 10, 15].map((num) => {
                       const active = candidateCount === num;
                       return (
                         <button
@@ -1112,9 +1116,9 @@ export default function App() {
                             flex: 1,
                             padding: '6px 8px',
                             borderRadius: 8,
-                            border: `1px solid ${active ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.06)'}`,
-                            backgroundColor: active ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-                            color: active ? '#ffffff' : '#71717a',
+                            border: `1px solid ${active ? 'rgba(37, 99, 235, 0.25)' : 'rgba(37, 99, 235, 0.06)'}`,
+                            backgroundColor: active ? 'rgba(37, 99, 235, 0.08)' : 'transparent',
+                            color: active ? '#0f172a' : '#64748b',
                             fontSize: 11,
                             fontWeight: 600,
                             cursor: 'pointer',
@@ -1140,7 +1144,7 @@ export default function App() {
                   style={{
                     height: 110,
                     borderRadius: 14,
-                    border: '1px solid rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(37, 99, 235, 0.06)',
                   }}
                 />
               ))}
@@ -1148,13 +1152,14 @@ export default function App() {
           )}
 
           {/* Candidates Result Cards */}
+          {!loading && generationMode && <p role="status" style={{ fontSize: 12, color: '#475569', lineHeight: 1.6 }}>{generationMode === 'AI' ? 'Предложения ИИ с объяснением идеи. Доступность проверяется отдельно.' : 'Базовый подбор без ИИ: сейчас доступны шаблонные варианты.'}{candidates[0]?.tags?.includes('original') && ' Первым показано ваше название.'}{candidates.length === 0 && ' Варианты не найдены. Попробуйте название латиницей; для подбора по описанию нужен ИИ.'}</p>}
           {!loading && candidates.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 6 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px' }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#71717a', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                   Результаты ({candidates.length})
                 </span>
-                <span style={{ fontSize: 11, color: '#52525b', fontFamily: 'JetBrains Mono, monospace' }}>
+                <span style={{ fontSize: 11, color: '#64748b', fontFamily: 'JetBrains Mono, monospace' }}>
                   Brand Score
                 </span>
               </div>
@@ -1170,8 +1175,8 @@ export default function App() {
                     style={{
                       padding: '14px 16px',
                       borderRadius: 14,
-                      backgroundColor: '#121215',
-                      border: `1px solid ${c.availableEverywhere ? 'rgba(16, 185, 129, 0.35)' : 'rgba(255, 255, 255, 0.07)'}`,
+                      backgroundColor: '#ffffff',
+                      border: `1px solid ${c.availableEverywhere ? 'rgba(16, 185, 129, 0.35)' : 'rgba(37, 99, 235, 0.07)'}`,
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 10,
@@ -1186,7 +1191,7 @@ export default function App() {
                             fontSize: 17,
                             fontWeight: 700,
                             letterSpacing: -0.3,
-                            color: '#ffffff',
+                            color: '#0f172a',
                             fontFamily: 'JetBrains Mono, monospace',
                           }}
                         >
@@ -1203,9 +1208,9 @@ export default function App() {
                             gap: 4,
                             padding: '4px 8px',
                             borderRadius: 6,
-                            border: '1px solid rgba(255, 255, 255, 0.08)',
-                            backgroundColor: copiedName === c.name ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.04)',
-                            color: copiedName === c.name ? '#34d399' : '#a1a1aa',
+                            border: '1px solid rgba(37, 99, 235, 0.08)',
+                            backgroundColor: copiedName === c.name ? 'rgba(16, 185, 129, 0.15)' : 'rgba(37, 99, 235, 0.04)',
+                            color: copiedName === c.name ? '#047857' : '#475569',
                             fontSize: 11,
                             cursor: 'pointer',
                             transition: 'all 0.15s ease',
@@ -1251,7 +1256,7 @@ export default function App() {
                           gap: 6,
                           fontSize: 11,
                           fontWeight: 600,
-                          color: '#34d399',
+                          color: '#047857',
                           backgroundColor: 'rgba(16, 185, 129, 0.08)',
                           border: '1px solid rgba(16, 185, 129, 0.2)',
                           borderRadius: 8,
@@ -1265,7 +1270,7 @@ export default function App() {
 
                     {/* Rationale & Tags */}
                     {c.reason && (
-                      <div style={{ fontSize: 12, color: '#8e8e99', lineHeight: 1.4 }}>
+                      <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.4 }}>
                         {c.reason}
                       </div>
                     )}
@@ -1277,8 +1282,8 @@ export default function App() {
                             key={tIdx}
                             style={{
                               fontSize: 10,
-                              color: '#71717a',
-                              backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                              color: '#64748b',
+                              backgroundColor: 'rgba(37, 99, 235, 0.04)',
                               padding: '2px 6px',
                               borderRadius: 4,
                             }}
@@ -1292,7 +1297,7 @@ export default function App() {
                     {/* Platform Checks Row */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 4 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: 11, color: '#71717a', fontWeight: 600, textTransform: 'uppercase' }}>
+                        <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
                           Доступность
                         </span>
                         <button
@@ -1301,7 +1306,7 @@ export default function App() {
                           style={{
                             background: 'none',
                             border: 'none',
-                            color: '#a1a1aa',
+                            color: '#475569',
                             fontSize: 11,
                             fontWeight: 600,
                             cursor: 'pointer',
@@ -1330,13 +1335,13 @@ export default function App() {
                                 alignItems: 'center',
                                 padding: '6px 10px',
                                 borderRadius: 8,
-                                backgroundColor: '#18181b',
-                                border: '1px solid rgba(255, 255, 255, 0.04)',
+                                backgroundColor: '#eff6ff',
+                                border: '1px solid rgba(37, 99, 235, 0.04)',
                               }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <div style={{ color: '#71717a' }}>{getPlatformIcon(chk.platform)}</div>
-                                <span style={{ fontSize: 12, color: '#f4f4f6', fontWeight: 500 }}>
+                                <div style={{ color: '#64748b' }}>{getPlatformIcon(chk.platform)}</div>
+                                <span style={{ fontSize: 12, color: '#0f172a', fontWeight: 500 }}>
                                   {chk.platform === Platform.DOMAIN ? chk.username : `@${chk.username}`}
                                 </span>
                                 <div
@@ -1366,9 +1371,9 @@ export default function App() {
                                   gap: 4,
                                   padding: '4px 8px',
                                   borderRadius: 6,
-                                  border: `1px solid ${isTracked ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255, 255, 255, 0.08)'}`,
-                                  backgroundColor: isTracked ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255, 255, 255, 0.03)',
-                                  color: isTracked ? '#34d399' : '#8e8e99',
+                                  border: `1px solid ${isTracked ? 'rgba(16, 185, 129, 0.25)' : 'rgba(37, 99, 235, 0.08)'}`,
+                                  backgroundColor: isTracked ? 'rgba(16, 185, 129, 0.1)' : 'rgba(37, 99, 235, 0.03)',
+                                  color: isTracked ? '#047857' : '#475569',
                                   fontSize: 11,
                                   cursor: isTracked ? 'default' : 'pointer',
                                 }}
@@ -1383,7 +1388,7 @@ export default function App() {
                     </div>
 
                     {/* Expandable Score Breakdown */}
-                    <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.04)', paddingTop: 6 }}>
+                    <div style={{ borderTop: '1px solid rgba(37, 99, 235, 0.04)', paddingTop: 6 }}>
                       <button
                         type="button"
                         onClick={() => toggleBreakdown(c.name)}
@@ -1394,7 +1399,7 @@ export default function App() {
                           justifyContent: 'space-between',
                           background: 'none',
                           border: 'none',
-                          color: '#71717a',
+                          color: '#64748b',
                           fontSize: 11,
                           cursor: 'pointer',
                           padding: '4px 0',
@@ -1414,7 +1419,7 @@ export default function App() {
                             marginTop: 8,
                             padding: '8px 10px',
                             borderRadius: 8,
-                            backgroundColor: '#18181b',
+                            backgroundColor: '#eff6ff',
                             fontSize: 11,
                           }}
                         >
@@ -1426,14 +1431,14 @@ export default function App() {
                             { label: 'Доступность', val: c.scoreBreakdown.availability, max: 40 },
                           ].map((item, bIdx) => (
                             <div key={bIdx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <span style={{ color: '#8e8e99' }}>{item.label}</span>
+                              <span style={{ color: '#475569' }}>{item.label}</span>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <div
                                   style={{
                                     width: 70,
                                     height: 4,
                                     borderRadius: 2,
-                                    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                                    backgroundColor: 'rgba(37, 99, 235, 0.06)',
                                     overflow: 'hidden',
                                   }}
                                 >
@@ -1441,12 +1446,12 @@ export default function App() {
                                     style={{
                                       width: `${(item.val / item.max) * 100}%`,
                                       height: '100%',
-                                      backgroundColor: '#ffffff',
+                                      backgroundColor: '#0f172a',
                                       borderRadius: 2,
                                     }}
                                   />
                                 </div>
-                                <span style={{ color: '#ffffff', fontFamily: 'JetBrains Mono, monospace', minWidth: 35, textAlign: 'right' }}>
+                                <span style={{ color: '#0f172a', fontFamily: 'JetBrains Mono, monospace', minWidth: 35, textAlign: 'right' }}>
                                   {item.val}/{item.max}
                                 </span>
                               </div>
@@ -1466,18 +1471,19 @@ export default function App() {
       {/* TAB 2: SINGLE QUICK CHECK */}
       {activeTab === 'check' && (
         <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <p style={{ fontSize: 12, lineHeight: 1.6, color: '#475569' }}>«Не подтверждено» означает, что сервис не смог определить доступность. Для Telegram отсутствие публичного профиля не гарантирует, что имя можно зарегистрировать.</p>
           <form onSubmit={handleQuickCheck} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                backgroundColor: '#121215',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
+                backgroundColor: '#ffffff',
+                border: '1px solid rgba(37, 99, 235, 0.1)',
                 borderRadius: 14,
                 padding: '4px 6px 4px 14px',
               }}
             >
-              <div style={{ color: '#71717a', marginRight: 10, display: 'flex', alignItems: 'center' }}>
+              <div style={{ color: '#64748b', marginRight: 10, display: 'flex', alignItems: 'center' }}>
                 <Icons.Search />
               </div>
               <input
@@ -1490,7 +1496,7 @@ export default function App() {
                   background: 'none',
                   border: 'none',
                   outline: 'none',
-                  color: '#ffffff',
+                  color: '#0f172a',
                   fontSize: 14,
                   padding: '10px 0',
                 }}
@@ -1502,8 +1508,8 @@ export default function App() {
                   padding: '10px 16px',
                   borderRadius: 10,
                   border: 'none',
-                  backgroundColor: loading || !checkUsername.trim() ? '#27272a' : '#ffffff',
-                  color: loading || !checkUsername.trim() ? '#52525b' : '#000000',
+                  backgroundColor: loading || !checkUsername.trim() ? '#e2e8f0' : '#0f172a',
+                  color: loading || !checkUsername.trim() ? '#64748b' : '#ffffff',
                   fontWeight: 700,
                   fontSize: 12,
                   cursor: loading || !checkUsername.trim() ? 'not-allowed' : 'pointer',
@@ -1527,9 +1533,9 @@ export default function App() {
                       flex: 1,
                       padding: '8px 10px',
                       borderRadius: 10,
-                      border: `1px solid ${active ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.06)'}`,
-                      backgroundColor: active ? 'rgba(255, 255, 255, 0.07)' : '#121215',
-                      color: active ? '#ffffff' : '#71717a',
+                      border: `1px solid ${active ? 'rgba(37, 99, 235, 0.25)' : 'rgba(37, 99, 235, 0.06)'}`,
+                      backgroundColor: active ? 'rgba(37, 99, 235, 0.07)' : '#ffffff',
+                      color: active ? '#0f172a' : '#64748b',
                       fontSize: 12,
                       fontWeight: 600,
                       cursor: 'pointer',
@@ -1550,7 +1556,7 @@ export default function App() {
           {/* Quick Check Results */}
           {!loading && singleResults.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#71717a', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                 Результаты проверки ({singleResults.length})
               </div>
 
@@ -1566,20 +1572,20 @@ export default function App() {
                     style={{
                       padding: '12px 14px',
                       borderRadius: 12,
-                      backgroundColor: '#121215',
-                      border: '1px solid rgba(255, 255, 255, 0.07)',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid rgba(37, 99, 235, 0.07)',
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ color: '#71717a' }}>{getPlatformIcon(r.platform)}</div>
+                      <div style={{ color: '#64748b' }}>{getPlatformIcon(r.platform)}</div>
                       <div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: '#ffffff', fontFamily: 'JetBrains Mono, monospace' }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', fontFamily: 'JetBrains Mono, monospace' }}>
                           {r.platform === Platform.DOMAIN ? r.username : `@${r.username}`}
                         </div>
-                        <div style={{ fontSize: 11, color: '#71717a' }}>
+                        <div style={{ fontSize: 11, color: '#64748b' }}>
                           {getPlatformLabel(r.platform)}
                         </div>
                       </div>
@@ -1612,9 +1618,9 @@ export default function App() {
                           gap: 4,
                           padding: '5px 9px',
                           borderRadius: 8,
-                          border: `1px solid ${isTracked ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255, 255, 255, 0.08)'}`,
-                          backgroundColor: isTracked ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255, 255, 255, 0.04)',
-                          color: isTracked ? '#34d399' : '#a1a1aa',
+                          border: `1px solid ${isTracked ? 'rgba(16, 185, 129, 0.25)' : 'rgba(37, 99, 235, 0.08)'}`,
+                          backgroundColor: isTracked ? 'rgba(16, 185, 129, 0.1)' : 'rgba(37, 99, 235, 0.04)',
+                          color: isTracked ? '#047857' : '#475569',
                           fontSize: 11,
                           cursor: isTracked ? 'default' : 'pointer',
                         }}
@@ -1639,8 +1645,8 @@ export default function App() {
             style={{
               padding: '12px 14px',
               borderRadius: 14,
-              backgroundColor: '#121215',
-              border: '1px solid rgba(255, 255, 255, 0.07)',
+              backgroundColor: '#ffffff',
+              border: '1px solid rgba(37, 99, 235, 0.07)',
               display: 'flex',
               flexDirection: 'column',
               gap: 8,
@@ -1648,10 +1654,10 @@ export default function App() {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#ffffff' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
                   Слоты фонового мониторинга
                 </div>
-                <div style={{ fontSize: 11, color: '#71717a' }}>
+                <div style={{ fontSize: 11, color: '#64748b' }}>
                   Оповещение в Telegram при освобождении
                 </div>
               </div>
@@ -1661,7 +1667,7 @@ export default function App() {
                   type="button"
                   onClick={() => {
                     triggerHaptic('light');
-                    fetchWatchlist(authToken);
+                    void fetchWatchlist(authToken);
                   }}
                   style={{
                     display: 'flex',
@@ -1669,9 +1675,9 @@ export default function App() {
                     gap: 4,
                     padding: '4px 8px',
                     borderRadius: 6,
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                    color: '#a1a1aa',
+                    border: '1px solid rgba(37, 99, 235, 0.08)',
+                    backgroundColor: 'rgba(37, 99, 235, 0.04)',
+                    color: '#475569',
                     fontSize: 11,
                     cursor: 'pointer',
                   }}
@@ -1683,8 +1689,8 @@ export default function App() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11 }}>
-              <span style={{ color: '#8e8e99' }}>Использовано слотов:</span>
-              <span style={{ color: watchlist.length >= 3 ? '#fbbf24' : '#34d399', fontWeight: 600 }}>
+              <span style={{ color: '#475569' }}>Использовано слотов:</span>
+              <span style={{ color: watchlist.length >= 3 ? '#92400e' : '#047857', fontWeight: 600 }}>
                 {watchlist.length} / 3 активных (Тариф FREE)
               </span>
             </div>
@@ -1694,7 +1700,7 @@ export default function App() {
                 width: '100%',
                 height: 3,
                 borderRadius: 2,
-                backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                backgroundColor: 'rgba(37, 99, 235, 0.06)',
                 overflow: 'hidden',
               }}
             >
@@ -1702,7 +1708,7 @@ export default function App() {
                 style={{
                   width: `${Math.min(100, (watchlist.length / 3) * 100)}%`,
                   height: '100%',
-                  backgroundColor: watchlist.length >= 3 ? '#f59e0b' : '#ffffff',
+                  backgroundColor: watchlist.length >= 3 ? '#f59e0b' : '#0f172a',
                   transition: 'width 0.3s ease',
                 }}
               />
@@ -1725,8 +1731,8 @@ export default function App() {
                 padding: '36px 20px',
                 textAlign: 'center',
                 borderRadius: 14,
-                backgroundColor: '#121215',
-                border: '1px dashed rgba(255, 255, 255, 0.1)',
+                backgroundColor: '#ffffff',
+                border: '1px dashed rgba(37, 99, 235, 0.1)',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -1738,19 +1744,19 @@ export default function App() {
                   width: 44,
                   height: 44,
                   borderRadius: 22,
-                  backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                  backgroundColor: 'rgba(37, 99, 235, 0.04)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#71717a',
+                  color: '#64748b',
                 }}
               >
                 <Icons.Bell />
               </div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#ffffff' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
                 Список отслеживания пуст
               </div>
-              <div style={{ fontSize: 12, color: '#71717a', maxWidth: 280, lineHeight: 1.4 }}>
+              <div style={{ fontSize: 12, color: '#64748b', maxWidth: 280, lineHeight: 1.4 }}>
                 Найдите занятый юзернейм во вкладке «Генератор» или «Проверка» и нажмите «Следить».
               </div>
               <button
@@ -1764,8 +1770,8 @@ export default function App() {
                   padding: '8px 16px',
                   borderRadius: 8,
                   border: 'none',
-                  backgroundColor: '#ffffff',
-                  color: '#000000',
+                  backgroundColor: '#0f172a',
+                  color: '#ffffff',
                   fontSize: 12,
                   fontWeight: 600,
                   cursor: 'pointer',
@@ -1792,8 +1798,8 @@ export default function App() {
                     style={{
                       padding: '12px 14px',
                       borderRadius: 12,
-                      backgroundColor: '#121215',
-                      border: '1px solid rgba(255, 255, 255, 0.07)',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid rgba(37, 99, 235, 0.07)',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 8,
@@ -1801,12 +1807,12 @@ export default function App() {
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ color: '#71717a' }}>{getPlatformIcon(item.platform)}</div>
+                        <div style={{ color: '#64748b' }}>{getPlatformIcon(item.platform)}</div>
                         <span
                           style={{
                             fontSize: 15,
                             fontWeight: 700,
-                            color: '#ffffff',
+                            color: '#0f172a',
                             fontFamily: 'JetBrains Mono, monospace',
                           }}
                         >
@@ -1831,7 +1837,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: '#52525b' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: '#64748b' }}>
                       <span>Проверено: {formatRelativeTime(item.lastCheckedAt)}</span>
                       <span>Фон: каждые 6 ч.</span>
                     </div>
@@ -1845,9 +1851,9 @@ export default function App() {
                           flex: 1,
                           padding: '6px 10px',
                           borderRadius: 8,
-                          border: '1px solid rgba(255, 255, 255, 0.08)',
-                          backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                          color: '#ffffff',
+                          border: '1px solid rgba(37, 99, 235, 0.08)',
+                          backgroundColor: 'rgba(37, 99, 235, 0.04)',
+                          color: '#0f172a',
                           fontSize: 11,
                           fontWeight: 600,
                           cursor: isChecking ? 'not-allowed' : 'pointer',

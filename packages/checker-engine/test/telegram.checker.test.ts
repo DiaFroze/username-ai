@@ -33,6 +33,18 @@ describe('TelegramChecker', () => {
   });
 
   describe('check logic with mocked responses', () => {
+    it.each([
+      'If you have <strong>Telegram</strong>, you can contact <a>@randomname</a> right away.',
+      'If you have Telegram, you can contact @randomname right away.',
+    ])('does not treat a generic contact page with Send Message as taken: %s', async prompt => {
+      const checker = new TelegramChecker({ fetch: (async () => new Response(`<style>.tgme_page_photo { display:block }</style><div class="tgme_page_description">${prompt}</div><a class="tgme_action_button_new">Send Message</a>`)) as typeof fetch });
+      expect((await checker.check('randomname')).status).toBe(CheckStatus.UNKNOWN);
+    });
+
+    it('does not infer taken from a lone action button or CSS', async () => {
+      const checker = new TelegramChecker({ fetch: (async () => new Response('<style>.tgme_page_photo{}</style><a class="tgme_action_button_new">Send Message</a>')) as typeof fetch });
+      expect((await checker.check('randomname')).status).toBe(CheckStatus.UNKNOWN);
+    });
     it('returns TAKEN for reserved usernames immediately without network call', async () => {
       const result = await checker.check('telegram');
       expect(result.status).toBe(CheckStatus.TAKEN);

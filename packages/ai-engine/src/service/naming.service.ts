@@ -58,10 +58,11 @@ export class NamingService {
     const intent = request.intent || 'BRAND';
     const cleanQuery = NameNormalizer.clean(rawQuery);
     const compactQuery = NameNormalizer.toCompact(rawQuery);
+    const originalName = /\s/.test(rawQuery) ? compactQuery : cleanQuery;
 
     // 1. Generate Deterministic Variations
     const deterministicCandidates = this.deterministic.generate(
-      compactQuery || cleanQuery,
+      rawQuery,
       intent,
       30
     );
@@ -72,11 +73,11 @@ export class NamingService {
 
     if (this.aiCache) {
       const cached = await this.aiCache.get({
-        query: cleanQuery,
+        query: rawQuery.toLowerCase(),
         intent,
         language: request.language,
         category: request.category,
-      });
+      }, `v2:${this.aiProvider.providerName}:${process.env.AI_MODEL || 'default'}`);
       if (cached) {
         aiCandidates = cached;
         aiCacheHit = true;
@@ -89,7 +90,7 @@ export class NamingService {
       const aiStart = Date.now();
       try {
         aiCandidates = await this.aiProvider.generateNames({
-          query: cleanQuery,
+          query: rawQuery,
           intent,
           language: request.language || 'ru',
           category: request.category,
@@ -102,8 +103,9 @@ export class NamingService {
         // Populate AI Cache
         if (this.aiCache && aiCandidates.length > 0) {
           await this.aiCache.set(
-            { query: cleanQuery, intent, language: request.language, category: request.category },
-            aiCandidates
+            { query: rawQuery.toLowerCase(), intent, language: request.language, category: request.category },
+            aiCandidates,
+            `v2:${this.aiProvider.providerName}:${process.env.AI_MODEL || 'default'}`
           );
         }
       } catch (err: any) {
@@ -113,7 +115,11 @@ export class NamingService {
     }
 
     // 3. Combine and Deduplicate candidates
-    const allCandidates: GeneratedCandidate[] = [...aiCandidates, ...deterministicCandidates];
+    const original: GeneratedCandidate[] = NameNormalizer.isValid(originalName)
+      ? [{ name: originalName, generationType: 'SHORTEN', reason: 'Ваше исходное имя — сначала проверяем его', tags: ['original'] }]
+      : [];
+    const liveAiNames = new Set(aiCandidates.filter(c => c.origin !== 'TEMPLATE' && this.aiProvider.providerName !== 'mock').map(c => c.name));
+    const allCandidates: GeneratedCandidate[] = [...original, ...aiCandidates, ...deterministicCandidates];
     const dedupedCandidates = NameNormalizer.deduplicate(allCandidates, c => c.name);
     this.metrics.generatedCandidatesTotal += dedupedCandidates.length;
 
@@ -127,10 +133,15 @@ export class NamingService {
     });
 
     // Sort by preliminary score descending
-    preliminaryScored.sort((a, b) => b.preliminaryScore - a.preliminaryScore);
+    preliminaryScored.sort((a, b) => {
+      if (a.candidate.name === originalName) return -1;
+      if (b.candidate.name === originalName) return 1;
+      const aiPriority = Number(liveAiNames.has(b.candidate.name)) - Number(liveAiNames.has(a.candidate.name));
+      return aiPriority || b.preliminaryScore - a.preliminaryScore;
+    });
 
     // 5. Select Top Candidates for external verification (Cost Control)
-    const limit = request.count || this.maxCandidatesToVerify;
+    const limit = Math.max(1, Math.min(request.count || this.maxCandidatesToVerify, this.maxCandidatesToVerify));
     const topToVerify = preliminaryScored.slice(0, limit);
     this.metrics.checkedCandidatesTotal += topToVerify.length;
 
@@ -165,9 +176,13 @@ export class NamingService {
     // Sort priority:
     // Available Everywhere (100% available) > Available on most platforms > Highest Brand Score
     finalCandidates.sort((a, b) => {
+      if (a.name === originalName) return -1;
+      if (b.name === originalName) return 1;
+      const aiPriority = Number(liveAiNames.has(b.name)) - Number(liveAiNames.has(a.name));
+      if (aiPriority) return aiPriority;
       // Priority 1: Available Everywhere
-      if (a.availableEverywhere && !b.availableEverywhere) return -1;
-      if (!a.availableEverywhere && b.availableEverywhere) return 1;
+      if (request.oneNameEverywhere && a.availableEverywhere && !b.availableEverywhere) return -1;
+      if (request.oneNameEverywhere && !a.availableEverywhere && b.availableEverywhere) return 1;
 
       // Priority 2: Availability score (from breakdown)
       if (a.scoreBreakdown.availability !== b.scoreBreakdown.availability) {
@@ -179,6 +194,7 @@ export class NamingService {
     });
 
     return {
+      generationMode: liveAiNames.size > 0 ? 'AI' : 'TEMPLATE',
       query: rawQuery,
       totalCandidates: finalCandidates.length,
       candidates: finalCandidates,

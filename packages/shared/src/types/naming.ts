@@ -25,6 +25,7 @@ export interface NamingRequest {
 }
 
 export interface GeneratedCandidate {
+  origin?: 'AI' | 'TEMPLATE';
   name: string;
   reason?: string;
   tags?: string[];
@@ -63,6 +64,7 @@ export interface NamingPipelineRequest {
 }
 
 export interface NamingPipelineResponse {
+  generationMode?: 'AI' | 'TEMPLATE';
   query: string;
   totalCandidates: number;
   candidates: ScoredCandidate[];

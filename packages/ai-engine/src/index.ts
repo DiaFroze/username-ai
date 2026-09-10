@@ -6,6 +6,7 @@ export * from './providers/ai.schema.js';
 export * from './providers/mock.provider.js';
 export * from './providers/openai.provider.js';
 export * from './providers/gemini.provider.js';
+export * from './providers/mirai.provider.js';
 export * from './providers/provider.factory.js';
 export * from './cache/ai.cache.js';
 export * from './service/naming.service.js';

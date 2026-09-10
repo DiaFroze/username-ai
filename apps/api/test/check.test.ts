@@ -11,7 +11,7 @@ describe('POST /check/telegram (Auth & Validation)', () => {
   const mockFetch = async () => ({
     ok: true,
     status: 200,
-    text: async () => '<html><body><a class="tgme_action_button_new" href="#">View in Telegram</a></body></html>',
+    text: async () => '<html><body><div class="tgme_page_title">Example profile</div><div class="tgme_page_extra">100 subscribers</div><a class="tgme_action_button_new" href="#">View in Telegram</a></body></html>',
   }) as any;
 
   const customChecker = new TelegramChecker({ fetch: mockFetch });

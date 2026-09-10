@@ -20,7 +20,7 @@ describe('Watchlist API Endpoints (/api/v1/watchlist)', () => {
       fetch: async () => ({
         ok: true,
         status: 200,
-        text: async () => '<html><body><div class="tgme_page_title">Taken</div><a class="tgme_action_button_new">View</a></body></html>',
+        text: async () => '<html><body><div class="tgme_page_title">Taken</div><div class="tgme_page_title">Example profile</div><div class="tgme_page_extra">100 subscribers</div><a class="tgme_action_button_new">View</a></body></html>',
       }) as any,
     }),
     youtubeChecker: new YouTubeChecker({

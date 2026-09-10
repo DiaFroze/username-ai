@@ -84,6 +84,14 @@ export class DeterministicGenerator {
 
     // Deduplicate and return up to maxCount
     const deduped = NameNormalizer.deduplicate(candidates, c => c.name);
-    return deduped.slice(0, maxCount);
+    // Interleave strategies so a short result list is not consumed by prefixes.
+    const groups = new Map<GenerationType, GeneratedCandidate[]>();
+    for (const c of deduped) groups.set(c.generationType, [...(groups.get(c.generationType) || []), c]);
+    const diverse: GeneratedCandidate[] = [];
+    const order: GenerationType[] = ['PHONETIC', 'COMPOUND', 'SHORTEN', 'ABBREVIATION', 'SUFFIX', 'PREFIX'];
+    for (let i = 0; diverse.length < deduped.length; i++) {
+      for (const type of order) { const c = groups.get(type)?.[i]; if (c) diverse.push(c); }
+    }
+    return diverse.slice(0, maxCount);
   }
 }

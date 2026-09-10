@@ -12,6 +12,34 @@ import {
 import { Platform } from '@username/shared';
 
 describe('NamingService Pipeline', () => {
+  it('keeps the exact input first and semantic AI names ahead of short templates', async () => {
+    const generateNames = vi.fn().mockResolvedValue([
+      { name: 'emberloom', generationType: 'AI_CREATIVE', reason: 'Тепло и ручная работа' },
+      { name: 'roastory', generationType: 'AI_CREATIVE', reason: 'Истории о кофе' },
+    ]);
+    const check = vi.fn().mockResolvedValue({ results: [] });
+    const service = new NamingService({ aiProvider: { providerName: 'test-ai', generateNames }, coordinator: { check } as any, maxCandidatesToVerify: 3 });
+    const res = await service.generateAndCheck({ query: 'coffee_brand', platforms: [Platform.TELEGRAM], count: 20 });
+    expect(res.candidates[0]?.name).toBe('coffee_brand');
+    expect(res.candidates.slice(1).map(c => c.name).sort()).toEqual(['emberloom', 'roastory']);
+    expect(check).toHaveBeenCalledTimes(3);
+    expect(res.generationMode).toBe('AI');
+  });
+
+  it('passes the full Russian brand description to AI without losing its meaning', async () => {
+    const generateNames = vi.fn().mockResolvedValue([{ name: 'emberloom', generationType: 'AI_CREATIVE' }]);
+    const service = new NamingService({ aiProvider: { providerName: 'test-ai', generateNames }, coordinator: { check: vi.fn().mockResolvedValue({ results: [] }) } as any });
+    await service.generateAndCheck({ query: 'Уютная кофейня у дома', platforms: [Platform.TELEGRAM] });
+    expect(generateNames).toHaveBeenCalledWith(expect.objectContaining({ query: 'Уютная кофейня у дома' }));
+  });
+
+  it('labels mock generation as templates rather than AI', async () => {
+    const service = new NamingService({ aiProvider: new MockAIProvider(), coordinator: { check: vi.fn().mockResolvedValue({ results: [] }) } as any });
+    const res = await service.generateAndCheck({ query: 'coffee', platforms: [Platform.TELEGRAM] });
+    expect(res.generationMode).toBe('TEMPLATE');
+    expect(res.candidates[0]?.name).toBe('coffee');
+    expect(res.candidates.every(c => c.generationType !== 'AI_CREATIVE')).toBe(true);
+  });
   const mockTgFetch = async (url: string) => {
     // Make 'trynova' available, and 'nova' taken
     if (url.includes('trynova')) {
@@ -24,7 +52,7 @@ describe('NamingService Pipeline', () => {
     return {
       ok: true,
       status: 200,
-      text: async () => '<html><body><a class="tgme_action_button_new" href="#">View</a></body></html>',
+      text: async () => '<html><body><div class="tgme_page_title">Example profile</div><div class="tgme_page_extra">100 subscribers</div><a class="tgme_action_button_new" href="#">View</a></body></html>',
     } as any;
   };
 

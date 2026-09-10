@@ -2,7 +2,7 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Username AI</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -10,15 +10,16 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
       :root {
-        --bg-base: #09090b;
-        --bg-card: #121215;
-        --bg-card-hover: #17171c;
-        --bg-subtle: #1c1c21;
-        --border-subtle: rgba(255, 255, 255, 0.08);
-        --border-active: rgba(255, 255, 255, 0.22);
-        --text-primary: #f4f4f6;
-        --text-secondary: #8e8e99;
-        --text-tertiary: #5c5c66;
+        color-scheme: light;
+        --bg-base: #ffffff;
+        --bg-card: #ffffff;
+        --bg-card-hover: #f8fafc;
+        --bg-subtle: #eff6ff;
+        --border-subtle: rgba(37, 99, 235, 0.08);
+        --border-active: rgba(37, 99, 235, 0.22);
+        --text-primary: #0f172a;
+        --text-secondary: #475569;
+        --text-tertiary: #64748b;
         --accent-emerald: #10b981;
         --accent-emerald-subtle: rgba(16, 185, 129, 0.12);
         --accent-rose: #f43f5e;
@@ -57,7 +58,7 @@
         background: transparent;
       }
       ::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.12);
+        background: rgba(37, 99, 235, 0.12);
         border-radius: 4px;
       }
 
@@ -82,10 +83,16 @@
       }
 
       .shimmer {
-        background: linear-gradient(90deg, #16161b 25%, #24242c 50%, #16161b 75%);
+        background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
         background-size: 200% 100%;
         animation: shimmer 1.8s infinite;
       }
+    
+      input { min-width: 0; }
+      input::placeholder { color: #64748b; }
+      button:focus-visible, input:focus-visible { outline: 2px solid #2563eb !important; outline-offset: 3px; }
+      button[type="submit"]:not(:disabled) { background: #2563eb !important; color: #fff !important; }
+      @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
     </style>
   </head>
   <body>
