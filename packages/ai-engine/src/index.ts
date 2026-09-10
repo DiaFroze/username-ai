@@ -10,3 +10,4 @@ export * from './providers/mirai.provider.js';
 export * from './providers/provider.factory.js';
 export * from './cache/ai.cache.js';
 export * from './service/naming.service.js';
+export * from './advisor/advisor.service.js';

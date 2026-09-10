@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   CheckerResult,
   CheckStatus,
@@ -101,6 +101,16 @@ const Icons = {
       <path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/>
     </svg>
   ),
+  Chat: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>
+    </svg>
+  ),
+  Send: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>
+    </svg>
+  ),
 };
 
 const INTENTS: { id: NamingIntent; label: string }[] = [
@@ -124,7 +134,7 @@ const CATEGORIES = [
 ];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'generate' | 'check' | 'watchlist'>('generate');
+  const [activeTab, setActiveTab] = useState<'generate' | 'check' | 'advisor' | 'watchlist'>('generate');
 
   // AI Generator state
   const [query, setQuery] = useState('');
@@ -141,6 +151,21 @@ export default function App() {
   // Single-check state
   const [checkUsername, setCheckUsername] = useState('');
   const [singleResults, setSingleResults] = useState<CheckerResult[]>([]);
+
+  // AI Advisor Chat state
+  const [advisorMessages, setAdvisorMessages] = useState<
+    Array<{ role: 'user' | 'assistant'; content: string; suggestions?: string[] }>
+  >([
+    {
+      role: 'assistant',
+      content:
+        'Привет! Я **AI-советник по брендингу и неймингу** Username AI. Помогу выбрать стратегию имени, оценить звучание, посоветовать доменные зоны (.com, .ai, .uz) или сгенерировать точные идеи для вашего проекта.',
+      suggestions: ['lumina', 'velox', 'synapse', 'zenith'],
+    },
+  ]);
+  const [advisorInput, setAdvisorInput] = useState('');
+  const [advisorLoading, setAdvisorLoading] = useState(false);
+  const advisorEndRef = useRef<HTMLDivElement>(null);
 
   // Watchlist state
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
@@ -366,6 +391,69 @@ export default function App() {
       setLoading(false);
     }
   };
+
+  const handleAdvisorSend = async (overridePrompt?: string) => {
+    const textToSend = (overridePrompt || advisorInput).trim();
+    if (!textToSend || advisorLoading) return;
+
+    triggerHaptic('medium');
+    const updated = [...advisorMessages, { role: 'user' as const, content: textToSend }];
+    setAdvisorMessages(updated);
+    setAdvisorInput('');
+    setAdvisorLoading(true);
+
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+      const res = await fetch(`${API_BASE}/api/v1/naming/advisor`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          messages: updated.map((m) => ({ role: m.role, content: m.content })),
+          language: 'ru',
+          context: { query: query || checkUsername || undefined },
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Ошибка запроса (${res.status})`);
+      }
+
+      const data = await res.json();
+      setAdvisorMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: data.reply || 'Не удалось сформировать рекомендацию.',
+          suggestions: data.suggestions || [],
+        },
+      ]);
+      triggerHaptic('light');
+    } catch {
+      setAdvisorMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: '⚠️ Не удалось связаться с AI-советником. Попробуйте отправить сообщение снова.',
+        },
+      ]);
+    } finally {
+      setAdvisorLoading(false);
+    }
+  };
+
+  const handleSelectSuggestedName = (name: string) => {
+    triggerHaptic('medium');
+    setCheckUsername(name);
+    setActiveTab('check');
+  };
+
+  useEffect(() => {
+    if (activeTab === 'advisor') {
+      advisorEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [advisorMessages, activeTab]);
 
   const handleAddToWatchlist = async (platform: Platform, target: string, tld?: SupportedTld) => {
     triggerHaptic('medium');
@@ -705,6 +793,34 @@ export default function App() {
         >
           <Icons.Search />
           <span>Проверка</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            triggerHaptic('light');
+            setActiveTab('advisor');
+          }}
+          style={{
+            flex: 1,
+            padding: '8px 8px',
+            borderRadius: 9,
+            border: 'none',
+            backgroundColor: activeTab === 'advisor' ? '#e2e8f0' : 'transparent',
+            color: activeTab === 'advisor' ? '#0f172a' : '#64748b',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 5,
+            transition: 'all 0.15s ease',
+            boxShadow: activeTab === 'advisor' ? '0 1px 3px rgba(15,23,42,0.06)' : 'none',
+          }}
+        >
+          <Icons.Chat />
+          <span>Советник</span>
         </button>
 
         <button
@@ -1637,7 +1753,254 @@ export default function App() {
         </div>
       )}
 
-      {/* TAB 3: WATCHLIST MONITOR */}
+      {/* TAB 3: AI BRANDING ADVISOR CHAT */}
+      {activeTab === 'advisor' && (
+        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* Advisor Header Card */}
+          <div
+            style={{
+              padding: '12px 14px',
+              borderRadius: 14,
+              backgroundColor: '#ffffff',
+              border: '1px solid rgba(37, 99, 235, 0.08)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                  color: '#2563eb',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Icons.Chat />
+              </div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
+                  AI-Советник по брендингу
+                </div>
+                <div style={{ fontSize: 11, color: '#64748b' }}>
+                  Консультации, оценка благозвучия и доменов
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                padding: '3px 8px',
+                borderRadius: 999,
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                color: '#059669',
+              }}
+            >
+              Online
+            </div>
+          </div>
+
+          {/* Quick Prompt Starter Pills */}
+          {advisorMessages.length <= 2 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', paddingLeft: 2 }}>
+                Быстрые вопросы для консультации:
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {[
+                  'Оцени имя "Novabrand" для стартапа',
+                  'Как выбрать домен кроме .com?',
+                  'Придумай 5 коротких названий для AI-бота',
+                  'Какие звуки делают бренд премиальным?',
+                ].map((prompt, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleAdvisorSend(prompt)}
+                    style={{
+                      padding: '6px 11px',
+                      borderRadius: 999,
+                      border: '1px solid rgba(37, 99, 235, 0.1)',
+                      backgroundColor: '#ffffff',
+                      color: '#0f172a',
+                      fontSize: 11,
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    💬 {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Chat Messages List */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
+              minHeight: 280,
+              maxHeight: 460,
+              overflowY: 'auto',
+              paddingRight: 2,
+            }}
+          >
+            {advisorMessages.map((msg, idx) => {
+              const isUser = msg.role === 'user';
+              return (
+                <div
+                  key={idx}
+                  className="animate-fade-in"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: isUser ? 'flex-end' : 'flex-start',
+                    gap: 6,
+                  }}
+                >
+                  <div
+                    style={{
+                      maxWidth: '88%',
+                      padding: isUser ? '10px 14px' : '12px 14px',
+                      borderRadius: isUser ? '14px 14px 2px 14px' : '14px 14px 14px 2px',
+                      backgroundColor: isUser ? '#0f172a' : '#ffffff',
+                      color: isUser ? '#ffffff' : '#0f172a',
+                      border: isUser ? 'none' : '1px solid rgba(37, 99, 235, 0.08)',
+                      fontSize: 13,
+                      lineHeight: 1.55,
+                      boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
+                      whiteSpace: 'pre-line',
+                    }}
+                  >
+                    {msg.content}
+                  </div>
+
+                  {/* Clickable suggested candidates */}
+                  {!isUser && msg.suggestions && msg.suggestions.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, paddingLeft: 4, marginTop: 2 }}>
+                      <span style={{ fontSize: 10, color: '#64748b', alignSelf: 'center', marginRight: 2 }}>
+                        Проверить:
+                      </span>
+                      {msg.suggestions.map((sug) => (
+                        <button
+                          key={sug}
+                          type="button"
+                          onClick={() => handleSelectSuggestedName(sug)}
+                          style={{
+                            padding: '3px 8px',
+                            borderRadius: 6,
+                            border: '1px solid rgba(37, 99, 235, 0.2)',
+                            backgroundColor: 'rgba(37, 99, 235, 0.05)',
+                            color: '#2563eb',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            fontFamily: 'JetBrains Mono, monospace',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}
+                        >
+                          <span>{sug}</span>
+                          <span style={{ fontSize: 9, opacity: 0.7 }}>→</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {advisorLoading && (
+              <div
+                className="animate-fade-in"
+                style={{
+                  alignSelf: 'flex-start',
+                  padding: '10px 14px',
+                  borderRadius: '14px 14px 14px 2px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid rgba(37, 99, 235, 0.08)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  color: '#64748b',
+                  fontSize: 12,
+                }}
+              >
+                <span className="animate-pulse">Советник печатает...</span>
+              </div>
+            )}
+            <div ref={advisorEndRef} />
+          </div>
+
+          {/* Message Input Box */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleAdvisorSend();
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              backgroundColor: '#ffffff',
+              border: '1px solid rgba(37, 99, 235, 0.12)',
+              borderRadius: 14,
+              padding: '4px 6px 4px 14px',
+              gap: 8,
+            }}
+          >
+            <input
+              type="text"
+              value={advisorInput}
+              onChange={(e) => setAdvisorInput(e.target.value)}
+              placeholder="Спросите советника (напр. Оцени имя, домены, нишу)..."
+              disabled={advisorLoading}
+              style={{
+                flex: 1,
+                background: 'none',
+                border: 'none',
+                outline: 'none',
+                color: '#0f172a',
+                fontSize: 13,
+                padding: '10px 0',
+              }}
+            />
+            <button
+              type="submit"
+              disabled={advisorLoading || !advisorInput.trim()}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                border: 'none',
+                backgroundColor: advisorLoading || !advisorInput.trim() ? '#e2e8f0' : '#2563eb',
+                color: advisorLoading || !advisorInput.trim() ? '#64748b' : '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: advisorLoading || !advisorInput.trim() ? 'not-allowed' : 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <Icons.Send />
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* TAB 4: WATCHLIST MONITOR */}
       {activeTab === 'watchlist' && (
         <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {/* Header with Slot Bar */}

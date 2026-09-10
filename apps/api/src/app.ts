@@ -18,6 +18,7 @@ import {
   createAIProvider,
   AiNamingCache,
   IAIProvider,
+  AdvisorService,
 } from '@username/ai-engine';
 import {
   WatchlistService,
@@ -38,6 +39,8 @@ import {
   Platform,
   CheckStatus,
   WatchlistItem,
+  AdvisorChatRequest,
+  AdvisorChatResponse,
 } from '@username/shared';
 
 export interface AppOptions {
@@ -51,6 +54,7 @@ export interface AppOptions {
   customCoordinator?: CheckerCoordinator;
   customCacheStore?: ICacheStore;
   customNamingService?: NamingService;
+  customAdvisorService?: AdvisorService;
   customAIProvider?: IAIProvider;
   customWatchlistService?: WatchlistService;
   customNotificationService?: NotificationService;
@@ -120,6 +124,10 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
       coordinator,
       aiCache,
     });
+
+  const advisorService =
+    options.customAdvisorService ||
+    new AdvisorService();
 
   // Notification & Watchlist Engine setup (Phase 1D)
   const notificationService =
@@ -713,6 +721,68 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
 
     api.post('/api/v1/naming/generate', namingRateLimitConfig, handleNamingGenerate);
     api.post('/naming/generate', namingRateLimitConfig, handleNamingGenerate);
+
+  // 5B. AI Branding Advisor & Consultant Agent (Interactive Chat)
+  const handleAdvisorConsult = async (
+    request: FastifyRequest<{ Body: AdvisorChatRequest }>,
+    reply: FastifyReply
+  ) => {
+    const { messages, language, context } = request.body || {};
+
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: 'BadRequest',
+        message: 'Field "messages" is required and must be a non-empty array',
+      });
+    }
+
+    const lastMsg = messages[messages.length - 1];
+    if (!lastMsg || !lastMsg.content || typeof lastMsg.content !== 'string' || !lastMsg.content.trim()) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: 'BadRequest',
+        message: 'Last message content must be a non-empty string',
+      });
+    }
+
+    if (lastMsg.content.length > 2000) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: 'BadRequest',
+        message: 'Message must not exceed 2000 characters',
+      });
+    }
+
+    try {
+      const response = await advisorService.consult({
+        messages,
+        language: language || 'ru',
+        context,
+      });
+
+      request.log.info({
+        reqId: request.id,
+        messagesCount: messages.length,
+        mode: response.mode,
+        suggestionsCount: response.suggestions?.length || 0,
+      }, 'AI Advisor consultation completed');
+
+      return reply.status(200).send(response);
+    } catch (err: any) {
+      request.log.error({ reqId: request.id, err: err.message }, 'AI Advisor consultation failed');
+      return reply.status(500).send({
+        statusCode: 500,
+        error: 'InternalServerError',
+        message: 'Failed to process AI Advisor consultation',
+      });
+    }
+  };
+
+  api.post('/api/v1/naming/advisor', namingRateLimitConfig, handleAdvisorConsult);
+  api.post('/api/v1/advisor/chat', namingRateLimitConfig, handleAdvisorConsult);
+  api.post('/advisor/chat', namingRateLimitConfig, handleAdvisorConsult);
+
 
     // 6. Watchlist & Background Monitoring API (Phase 1D)
     registerWatchlistRoutes(api, watchlistService, extractUser);

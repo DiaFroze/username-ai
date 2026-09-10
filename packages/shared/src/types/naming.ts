@@ -74,3 +74,26 @@ export interface NamingPipelineResponse {
     aiCacheHit: boolean;
   };
 }
+
+export interface AdvisorChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+export interface AdvisorChatRequest {
+  messages: AdvisorChatMessage[];
+  language?: NamingLanguage;
+  context?: {
+    query?: string;
+    currentBrand?: string;
+    category?: string;
+  };
+}
+
+export interface AdvisorChatResponse {
+  reply: string;
+  suggestions?: string[];
+  mode: 'AI' | 'FALLBACK';
+  provider?: string;
+}
+
