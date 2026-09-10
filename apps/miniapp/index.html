@@ -2,30 +2,89 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Username AI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
       :root {
-        --bg-color: #0f172a;
-        --card-bg: #1e293b;
-        --text-color: #f8fafc;
-        --accent-color: #38bdf8;
-        --input-bg: #334155;
-        --border-color: #475569;
+        --bg-base: #09090b;
+        --bg-card: #121215;
+        --bg-card-hover: #17171c;
+        --bg-subtle: #1c1c21;
+        --border-subtle: rgba(255, 255, 255, 0.08);
+        --border-active: rgba(255, 255, 255, 0.22);
+        --text-primary: #f4f4f6;
+        --text-secondary: #8e8e99;
+        --text-tertiary: #5c5c66;
+        --accent-emerald: #10b981;
+        --accent-emerald-subtle: rgba(16, 185, 129, 0.12);
+        --accent-rose: #f43f5e;
+        --accent-rose-subtle: rgba(244, 63, 94, 0.12);
+        --accent-amber: #f59e0b;
+        --accent-amber-subtle: rgba(245, 158, 11, 0.12);
       }
-      body {
-        margin: 0;
-        padding: 0;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-        background-color: var(--tg-theme-bg-color, var(--bg-color));
-        color: var(--tg-theme-text-color, var(--text-color));
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-      }
+
       * {
         box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      body {
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+        background-color: var(--bg-base);
+        color: var(--text-primary);
+        min-height: 100vh;
+        overflow-x: hidden;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      input, button, select, textarea {
+        font-family: inherit;
+      }
+
+      /* Custom minimalist scrollbar */
+      ::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.12);
+        border-radius: 4px;
+      }
+
+      /* Animations */
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      @keyframes pulseGlow {
+        0%, 100% { opacity: 0.4; }
+        50% { opacity: 0.8; }
+      }
+
+      @keyframes shimmer {
+        0% { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
+      }
+
+      .animate-fade-in {
+        animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+
+      .shimmer {
+        background: linear-gradient(90deg, #16161b 25%, #24242c 50%, #16161b 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.8s infinite;
       }
     </style>
   </head>
