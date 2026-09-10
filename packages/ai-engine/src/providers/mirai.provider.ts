@@ -20,7 +20,7 @@ export class MiraiProvider implements IAIProvider {
   private readonly customFetch?: typeof fetch;
 
   constructor(options?: MiraiProviderOptions) {
-    this.apiKey = options?.apiKey || process.env.MIRAI_API_KEY || process.env.OPENAI_API_KEY;
+    this.apiKey = options?.apiKey || process.env.MIRAI_API_KEY || process.env.OPENAI_API_KEY || process.env.API_KEY;
     this.baseUrl = (options?.baseUrl || process.env.MIRAI_BASE_URL || 'https://api.miraiapi.com/v1').replace(/\/+$/, '');
     this.model = options?.model || process.env.AI_MODEL || 'gpt-5.6-luna';
     this.timeoutMs = options?.timeoutMs ?? 12000;

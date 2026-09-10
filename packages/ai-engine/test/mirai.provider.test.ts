@@ -6,8 +6,10 @@ describe('MiraiProvider', () => {
   it('throws descriptive error when MIRAI_API_KEY is not configured', async () => {
     const originalKey = process.env.MIRAI_API_KEY;
     const originalOpenAI = process.env.OPENAI_API_KEY;
+    const originalApiKey = process.env.API_KEY;
     delete process.env.MIRAI_API_KEY;
     delete process.env.OPENAI_API_KEY;
+    delete process.env.API_KEY;
 
     try {
       const provider = new MiraiProvider({ apiKey: '' });
@@ -17,6 +19,7 @@ describe('MiraiProvider', () => {
     } finally {
       if (originalKey) process.env.MIRAI_API_KEY = originalKey;
       if (originalOpenAI) process.env.OPENAI_API_KEY = originalOpenAI;
+      if (originalApiKey) process.env.API_KEY = originalApiKey;
     }
   });
 
